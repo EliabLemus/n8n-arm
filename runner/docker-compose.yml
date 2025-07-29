@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  qemu:
+    image: tonistiigi/binfmt:latest
+    privileged: true
+    command: ["--install", "all"]
+    restart: on-failure
+
+  github-runner:
+    image: myoung34/github-runner:latest
+    container_name: github-runner
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - qemu

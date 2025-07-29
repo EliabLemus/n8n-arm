@@ -1,0 +1,59 @@
+name: Build and (conditionally) Push n8n (ARM64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  build-arm:
+    runs-on: self-hosted
+    labels: [arm-builder]
+
+    env:
+      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/n8n-arm64
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        run: |
+          docker buildx create --use --name builder || docker buildx use builder
+          docker buildx inspect --bootstrap
+
+      - name: Login to DockerHub (only for main)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set image tags
+        id: tags
+        run: |
+          DATE=$(date +%Y%m%d)
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            echo "tags=${IMAGE_NAME}:latest,${IMAGE_NAME}:${DATE}" >> $GITHUB_OUTPUT
+          else
+            echo "tags=${IMAGE_NAME}:test-${DATE}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build image
+        run: |
+          IFS=',' read -ra TAGS <<< "${{ steps.tags.outputs.tags }}"
+          for tag in "${TAGS[@]}"; do
+            docker buildx build \
+              --platform linux/arm64 \
+              --load \
+              -t "$tag" \
+              .
+          done
+
+      - name: Push image (only for main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          IFS=',' read -ra TAGS <<< "${{ steps.tags.outputs.tags }}"
+          for tag in "${TAGS[@]}"; do
+            docker push "$tag"
+          done
