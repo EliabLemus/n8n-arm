@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build and Push
-    runs-on: [self-hosted, arm-builder]
+    runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
 
